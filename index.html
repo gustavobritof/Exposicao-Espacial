@@ -180,12 +180,12 @@
             scene = new THREE.Scene();
             const textureLoader = new THREE.CubeTextureLoader();
             const skyboxTexture = textureLoader.load([
-                './images/background 2.jpg', // direita
-                './images/background 2.jpg', // esquerda
-                './images/background 2.jpg', // topo
-                './images/background 2.jpg', // chão
-                './images/background 2.jpg', // frente
-                './images/background 2.jpg'  // trás
+                './images/background.jpg', // direita
+                './images/background.jpg', // esquerda
+                './images/background.jpg', // topo
+                './images/background.jpg', // chão
+                './images/background.jpg', // frente
+                './images/background.jpg'  // trás
             ]);
             scene.background = skyboxTexture;
             scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
@@ -307,10 +307,10 @@
             });
 
             // Pedestais com objetos
-            createPedestal(-5, 0, -5, 0xff6b6b, "Estação Espacial Internacional", "Uma representação detalhada da ISS, destacando sua arquitetura única e módulos científicos.", "./models/ISS Correctglb.glb");
-            createPedestal(0, 0, -5, 0x4ecdc4, "Saturn V", "Um dos foguetes mais poderosos já construídos, simbolizando a exploração espacial.w", "./models/saturnVCorrect.glb");
+            createPedestal(-5, 0, -5, 0xff6b6b, "Estação Espacial Internacional", "Uma representação detalhada da ISS, destacando sua arquitetura única e módulos científicos.", "./models/ISS Correctglb.glb", 0.3);
+            createPedestal(0, 0, -5, 0x4ecdc4, "Saturn V", "Um dos foguetes mais poderosos já construídos, simbolizando a exploração espacial.", "./models/saturnVCorrect.glb", 0.2);
             createPedestal(5, 0, -5, 0xffe66d, "Ouro Solar", "Inspirada nos raios do sol, esta escultura captura luz e movimento em harmonia perfeita.", "./models/Voyager.glb");
-            createPedestal(-5, 0, 0, 0x95e1d3, "Serenidade Verde", "Representa a natureza e crescimento. Observe os detalhes entrelaçados.", "./models/jwst_james_webb_space_telescope.glb");
+            createPedestal(-5, 0, 0, 0x95e1d3, "Serenidade Verde", "Representa a natureza e crescimento. Observe os detalhes entrelaçados.", "./models/jwst_james_webb_space_telescope.glb", 0.05);
             createPedestal(5, 0, 0, 0xf38181, "Rosa Eterno", "Uma homenagem ao amor e delicadeza. Técnica mista com elementos metálicos.");
 
             // Quadros nas paredes
@@ -321,7 +321,7 @@
             createPainting(8, 2, -9.8, 0xf38181);
         }
 
-        function createPedestal(x, y, z, color, title, description, modelPath = null) {
+        function createPedestal(x, y, z, color, title, description, modelPath = null, scale = 1) {
             // Base do pedestal
             const pedestalGeometry = new THREE.CylinderGeometry(0.5, 0.6, 1, 8);
             const pedestalMaterial = new THREE.MeshStandardMaterial({
@@ -345,7 +345,7 @@
                 gltfLoader.load(modelPath, (gltf) => {
                     const model = gltf.scene;
                     model.position.set(x, y + 1.5, z);
-                    model.scale.set(0.2, 0.2, 0.2); // Ajustar escala conforme necessário
+                    model.scale.set(scale, scale, scale); // Ajustar escala conforme necessário
                     model.userData = {
                         rotate: true,
                         interactive: true,
@@ -660,9 +660,13 @@
             const description = document.createElement('p');
             description.textContent = object.userData.description;
 
+            const button = document.createElement('button');
+            button.textContent = 'Ver em tamanho real';
+
             panel.appendChild(closeBtn);
             panel.appendChild(title);
             panel.appendChild(description);
+            panel.appendChild(button);
 
             // Adicionar ao DOM primeiro para calcular dimensões
             document.body.appendChild(panel);
