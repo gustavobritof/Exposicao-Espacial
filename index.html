@@ -146,8 +146,12 @@
         Clique nos ícones 'i' para informações
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"
+        integrity="sha512-n8IpKWzDnBOcBhRlHirMZOUvEq2bLRMuJGjuVqbzUJwtTsgwOgK5aS0c1JA647XWYfqvXve8k3PtZdzpipFjgg=="
+        crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
     <script>
+
         let scene, camera, renderer, floor;
         let moveForward = false, moveBackward = false;
         let moveLeft = false, moveRight = false;
@@ -163,12 +167,22 @@
         let walls = [];
         let obstacles = []; // Pedestais e objetos
         const playerRadius = 0.5; // Raio de colisão do jogador
+        const gltfLoader = new THREE.GLTFLoader();
 
         // Configuração inicial
         function init() {
             // Cena
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87ceeb);
+            const textureLoader = new THREE.CubeTextureLoader();
+            const skyboxTexture = textureLoader.load([
+                './images/background 2.jpg', // direita
+                './images/background 2.jpg', // esquerda
+                './images/background 2.jpg', // topo
+                './images/background 2.jpg', // chão
+                './images/background 2.jpg', // frente
+                './images/background 2.jpg'  // trás
+            ]);
+            scene.background = skyboxTexture;
             scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
 
             // Câmera
@@ -280,10 +294,10 @@
             });
 
             // Pedestais com objetos
-            createPedestal(-5, 0, -5, 0xff6b6b, "Escultura Vermelha", "Uma peça contemporânea representando a paixão e energia. Criada em 2024 por artista local.");
-            createPedestal(0, 0, -5, 0x4ecdc4, "Arte Turquesa", "Símbolo de tranquilidade e equilíbrio. Esta obra explora formas geométricas complexas.");
-            createPedestal(5, 0, -5, 0xffe66d, "Ouro Solar", "Inspirada nos raios do sol, esta escultura captura luz e movimento em harmonia perfeita.");
-            createPedestal(-5, 0, 0, 0x95e1d3, "Serenidade Verde", "Representa a natureza e crescimento. Observe os detalhes entrelaçados.");
+            createPedestal(-5, 0, -5, 0xff6b6b, "Estação Espacial Internacional", "Uma representação detalhada da ISS, destacando sua arquitetura única e módulos científicos.", "./models/ISS Correctglb.glb");
+            createPedestal(0, 0, -5, 0x4ecdc4, "Saturn V", "Um dos foguetes mais poderosos já construídos, simbolizando a exploração espacial.w", "./models/saturn V.glb");
+            createPedestal(5, 0, -5, 0xffe66d, "Ouro Solar", "Inspirada nos raios do sol, esta escultura captura luz e movimento em harmonia perfeita.", "./models/Voyager.glb");
+            createPedestal(-5, 0, 0, 0x95e1d3, "Serenidade Verde", "Representa a natureza e crescimento. Observe os detalhes entrelaçados.", "./models/jwst_james_webb_space_telescope.glb");
             createPedestal(5, 0, 0, 0xf38181, "Rosa Eterno", "Uma homenagem ao amor e delicadeza. Técnica mista com elementos metálicos.");
 
             // Quadros nas paredes
@@ -294,7 +308,7 @@
             createPainting(8, 2, -9.8, 0xf38181);
         }
 
-        function createPedestal(x, y, z, color, title, description) {
+        function createPedestal(x, y, z, color, title, description, modelPath = null) {
             // Base do pedestal
             const pedestalGeometry = new THREE.CylinderGeometry(0.5, 0.6, 1, 8);
             const pedestalMaterial = new THREE.MeshStandardMaterial({
@@ -310,10 +324,34 @@
                 type: 'cylinder',
                 x: x,
                 z: z,
-                radius: 0.7 // Raio um pouco maior que o pedestal visual
+                radius: 0.7
             });
 
-            // Objeto exposto
+            // Se houver um modelo GLB, carregar; senão usar o objeto padrão
+            if (modelPath) {
+                gltfLoader.load(modelPath, (gltf) => {
+                    const model = gltf.scene;
+                    model.position.set(x, y + 1.5, z);
+                    model.scale.set(0.2, 0.2, 0.2); // Ajustar escala conforme necessário
+                    model.userData = {
+                        rotate: true,
+                        interactive: true,
+                        title: title,
+                        description: description
+                    };
+                    scene.add(model);
+                    interactiveObjects.push(model);
+                }, undefined, (error) => {
+                    console.error('Erro ao carregar modelo:', modelPath, error);
+                    // Fallback: criar objeto padrão
+                    createDefaultObject(x, y, z, color, title, description);
+                });
+            } else {
+                createDefaultObject(x, y, z, color, title, description);
+            }
+        }
+
+        function createDefaultObject(x, y, z, color, title, description) {
             const objectGeometry = new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8);
             const objectMaterial = new THREE.MeshStandardMaterial({
                 color: color,
@@ -381,19 +419,19 @@
         function onKeyDown(event) {
             switch (event.code) {
                 case 'ArrowUp':
-                case 'KeyS':
+                case 'KeyW':
                     moveForward = true;
                     break;
                 case 'ArrowLeft':
-                case 'KeyD':
+                case 'KeyA':
                     moveLeft = true;
                     break;
                 case 'ArrowDown':
-                case 'KeyW':
+                case 'KeyS':
                     moveBackward = true;
                     break;
                 case 'ArrowRight':
-                case 'KeyA':
+                case 'KeyD':
                     moveRight = true;
                     break;
                 case 'ShiftLeft':
@@ -406,19 +444,19 @@
         function onKeyUp(event) {
             switch (event.code) {
                 case 'ArrowUp':
-                case 'KeyS':
+                case 'KeyW':
                     moveForward = false;
                     break;
                 case 'ArrowLeft':
-                case 'KeyD':
+                case 'KeyA':
                     moveLeft = false;
                     break;
                 case 'ArrowDown':
-                case 'KeyW':
+                case 'KeyS':
                     moveBackward = false;
                     break;
                 case 'ArrowRight':
-                case 'KeyA':
+                case 'KeyD':
                     moveRight = false;
                     break;
                 case 'ShiftLeft':
@@ -479,18 +517,18 @@
             const forward = new THREE.Vector3();
             const right = new THREE.Vector3();
 
-            // Vetor forward baseado no yaw da câmera
+            // Vetor forward baseado no yaw da câmera (invertido para corrigir direção)
             forward.set(
-                -Math.sin(currentRotationY),
+                Math.sin(currentRotationY),
                 0,
-                -Math.cos(currentRotationY)
+                Math.cos(currentRotationY)
             );
 
-            // Vetor right perpendicular ao forward
+            // Vetor right perpendicular ao forward (invertido para corrigir direção)
             right.set(
-                Math.cos(currentRotationY),
+                -Math.cos(currentRotationY),
                 0,
-                -Math.sin(currentRotationY)
+                Math.sin(currentRotationY)
             );
 
             // Calcular nova posição baseada na direção da câmera
@@ -538,6 +576,10 @@
                 if (distance > 15) {
                     const hotspot = document.querySelector(`[data-object="${obj.uuid}"]`);
                     if (hotspot) hotspot.style.display = 'none';
+
+                    // Remover painel se o objeto estiver longe
+                    const panel = document.querySelector(`.info-panel[data-object="${obj.uuid}"]`);
+                    if (panel) panel.remove();
                     return;
                 }
 
@@ -548,6 +590,10 @@
                 if (vector.z > 1) {
                     const hotspot = document.querySelector(`[data-object="${obj.uuid}"]`);
                     if (hotspot) hotspot.style.display = 'none';
+
+                    // Remover painel se o objeto estiver atrás
+                    const panel = document.querySelector(`.info-panel[data-object="${obj.uuid}"]`);
+                    if (panel) panel.remove();
                     return;
                 }
 
@@ -563,7 +609,11 @@
                     hotspot.dataset.object = obj.uuid;
                     hotspot.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        showInfoPanel(obj, x, y);
+                        // Pegar posição real do hotspot no momento do clique
+                        const rect = hotspot.getBoundingClientRect();
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+                        showInfoPanel(obj, centerX, centerY);
                     });
                     document.body.appendChild(hotspot);
                 }
@@ -574,12 +624,13 @@
             });
         }
 
-        function showInfoPanel(object, x, y) {
+        function showInfoPanel(object, hotspotX, hotspotY) {
             // Remover painéis existentes
             document.querySelectorAll('.info-panel').forEach(p => p.remove());
 
             const panel = document.createElement('div');
             panel.className = 'info-panel';
+            panel.dataset.object = object.uuid;
 
             const closeBtn = document.createElement('button');
             closeBtn.className = 'close-btn';
@@ -598,11 +649,38 @@
             panel.appendChild(title);
             panel.appendChild(description);
 
-            // Posicionar perto do hotspot
-            panel.style.left = `${Math.min(Math.max(x + 50, 10), window.innerWidth - 330)}px`;
-            panel.style.top = `${Math.max(y - 80, 10)}px`;
-
+            // Adicionar ao DOM primeiro para calcular dimensões
             document.body.appendChild(panel);
+
+            // Agora pegar dimensões reais
+            const panelWidth = panel.offsetWidth;
+            const panelHeight = panel.offsetHeight;
+            const padding = 15;
+
+            // Tentar posicionar à direita do hotspot
+            let panelX = hotspotX + padding;
+            let panelY = hotspotY - (panelHeight / 2);
+
+            // Se não couber à direita, colocar à esquerda
+            if (panelX + panelWidth > window.innerWidth - 10) {
+                panelX = hotspotX - panelWidth - padding;
+            }
+
+            // Se não couber à esquerda também, forçar dentro da tela
+            if (panelX < 10) {
+                panelX = 10;
+            }
+
+            // Garantir que não saia verticalmente
+            if (panelY < 10) {
+                panelY = 10;
+            }
+            if (panelY + panelHeight > window.innerHeight - 10) {
+                panelY = window.innerHeight - panelHeight - 10;
+            }
+
+            panel.style.left = `${panelX}px`;
+            panel.style.top = `${panelY}px`;
         }
 
         function checkCollision(x, z) {
