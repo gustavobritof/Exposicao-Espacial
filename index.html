@@ -132,11 +132,6 @@
 </head>
 
 <body>
-    <div id="info">
-        <h3>🏛️ Museu Virtual WebXR</h3>
-        <p>Carregando ambiente...</p>
-        <p style="font-size: 11px; margin-top: 10px;">Use WASD para mover, mouse para olhar</p>
-    </div>
     <button id="vrButton">Entrar em RV</button>
     <div id="controls">
         <strong>Controles:</strong><br>
@@ -154,6 +149,7 @@
         integrity="sha256-+ncCNttOcMopCUa47Sn26Tg06ZC2SnWoi/XikKAhnSY=" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/three-x3@0.0.10/dist/x3-standalone.js"
         integrity="sha256-oKQUM+QPtvuvLmxpqxdxbrJAq21SZ+7hYK8WlGztXNE=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.126.0/examples/js/objects/Sky.js"></script>
     <script>
 
         let scene, camera, renderer, floor;
@@ -169,43 +165,548 @@
         let currentRotationY = 0, currentRotationX = 0;
         let cameraHolder;
         let walls = [];
-        let obstacles = []; // Pedestais e objetos
-        const playerRadius = 0.5; // Raio de colisão do jogador
+        let obstacles = [];
+        const playerRadius = 0.5;
         const gltfLoader = new THREE.GLTFLoader();
         let x3;
 
-        // Configuração inicial
+        let cameraRotationEnabled = true;
+        let isShiftPressed = false;
+        const rotationSpeedNormal = 0.1;
+        const rotationSpeedSlow = 0.03;
+        let infoPanelOpen = false;
+
+        let detailScene, detailCamera, detailRenderer;
+        let isInDetailView = false;
+        let currentDetailObject = null;
+
+        let isPanoramaMode = false;
+        let currentPanoramaScene = null;
+        let panoramaEnvironments = {
+            'kennedy': {
+                name: 'Centro Espacial Kennedy',
+                image: './images/kennedy-panorama.jpg',
+                position: { x: 0, y: 1.6, z: 0 },
+                useEmbedding: true,
+                embedUrl: 'https://www.google.com/maps/embed?pb=!4v1762740838344!6m8!1m7!1s6wyy-8WY3mlVknnlPsFV3A!2m2!1d28.60532695948118!2d-80.66950944302398!3f0.5495593664942362!4f4.101836796878231!5f0.7820865974627469'
+            },
+            'iss-lab': {
+                name: 'Laboratório ISS',
+                image: './images/iss-lab-panorama.jpg',
+                position: { x: 0, y: 1.6, z: 0 }
+            },
+            'launch-pad': {
+                name: 'Plataforma de Lançamento',
+                image: './images/launch-pad-panorama.jpg',
+                position: { x: 0, y: 1.6, z: 0 }
+            }
+        };
+
+        function createPanoramaScene(environmentKey) {
+            const env = panoramaEnvironments[environmentKey];
+            if (!env) return;
+
+            if (env.useEmbedding) {
+                createEmbeddingView(env, environmentKey);
+                return;
+            }
+
+            const panoramaScene = new THREE.Scene();
+
+            const sphereGeometry = new THREE.SphereGeometry(500, 64, 64);
+            const textureLoader = new THREE.TextureLoader();
+
+            textureLoader.load(env.image, (texture) => {
+                const panoramaMaterial = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    side: THREE.BackSide
+                });
+                const panoramaMesh = new THREE.Mesh(sphereGeometry, panoramaMaterial);
+                panoramaScene.add(panoramaMesh);
+            }, undefined, (error) => {
+                console.warn('Erro ao carregar panorama:', env.image, error);
+            });
+
+            const navPanel = document.createElement('div');
+            navPanel.style.cssText = `
+                position: absolute;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.7);
+                padding: 15px;
+                border-radius: 8px;
+                z-index: 200;
+                display: flex;
+                gap: 10px;
+            `;
+
+            const backButton = document.createElement('button');
+            backButton.textContent = '← Voltar ao Museu';
+            backButton.style.cssText = `
+                padding: 10px 20px;
+                background: #1a73e8;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            backButton.onclick = () => exitPanoramaView();
+            navPanel.appendChild(backButton);
+
+            Object.keys(panoramaEnvironments).forEach(key => {
+                if (key !== environmentKey) {
+                    const btn = document.createElement('button');
+                    btn.textContent = panoramaEnvironments[key].name;
+                    btn.style.cssText = `
+                        padding: 10px 15px;
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 12px;
+                    `;
+                    btn.onclick = () => {
+                        navPanel.remove();
+                        createPanoramaScene(key);
+                    };
+                    navPanel.appendChild(btn);
+                }
+            });
+
+            document.body.appendChild(navPanel);
+            navPanel.id = 'panoramaNav';
+
+            const instructions = document.createElement('div');
+            instructions.innerHTML = `<strong>${env.name}</strong><br>Mova o mouse para olhar ao redor`;
+            instructions.style.cssText = `
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                color: white;
+                background: rgba(0,0,0,0.7);
+                padding: 15px;
+                border-radius: 8px;
+                font-size: 14px;
+                z-index: 200;
+            `;
+            document.body.appendChild(instructions);
+            instructions.id = 'panoramaInstructions';
+
+            currentPanoramaScene = panoramaScene;
+            isPanoramaMode = true;
+
+            renderer.domElement.style.display = 'none';
+
+            const panoramaCamera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            panoramaCamera.position.set(env.position.x, env.position.y, env.position.z);
+
+            const panoramaRenderer = new THREE.WebGLRenderer({ antialias: true });
+            panoramaRenderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(panoramaRenderer.domElement);
+            panoramaRenderer.id = 'panoramaRenderer';
+
+            let mouseDown = false;
+            let mouseX = 0, mouseY = 0;
+            let rotX = 0, rotY = 0;
+
+            panoramaRenderer.domElement.addEventListener('mousedown', (e) => {
+                mouseDown = true;
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            panoramaRenderer.domElement.addEventListener('mousemove', (e) => {
+                if (mouseDown) {
+                    const deltaX = (e.clientX - mouseX) * 0.005;
+                    const deltaY = (e.clientY - mouseY) * 0.005;
+
+                    rotY += deltaX;
+                    rotX += deltaY;
+
+                    rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
+
+                    panoramaCamera.rotation.order = 'YXZ';
+                    panoramaCamera.rotation.y = rotY;
+                    panoramaCamera.rotation.x = rotX;
+
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                }
+            });
+
+            panoramaRenderer.domElement.addEventListener('mouseup', () => {
+                mouseDown = false;
+            });
+
+            panoramaRenderer.domElement.addEventListener('mouseleave', () => {
+                mouseDown = false;
+            });
+
+            function animatePanorama() {
+                if (!isPanoramaMode) return;
+                requestAnimationFrame(animatePanorama);
+                panoramaRenderer.render(panoramaScene, panoramaCamera);
+            }
+            animatePanorama();
+        }
+
+        function createEmbeddingView(env, environmentKey) {
+            isPanoramaMode = true;
+            renderer.domElement.style.display = 'none';
+
+            const container = document.createElement('div');
+            container.id = 'embeddingContainer';
+            container.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: #000;
+                z-index: 199;
+                display: flex;
+                flex-direction: column;
+            `;
+
+            const title = document.createElement('div');
+            title.style.cssText = `
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 15px;
+                text-align: center;
+                font-size: 20px;
+                font-weight: bold;
+                border-bottom: 2px solid #1a73e8;
+            `;
+            title.innerHTML = `<strong>${env.name}</strong>`;
+            container.appendChild(title);
+
+            const iframeContainer = document.createElement('div');
+            iframeContainer.style.cssText = `
+                flex: 1;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 10px;
+                overflow: hidden;
+            `;
+
+            const iframe = document.createElement('iframe');
+            iframe.src = env.embedUrl;
+            iframe.style.cssText = `
+                width: 95%;
+                height: 95%;
+                border: none;
+                border-radius: 8px;
+            `;
+            iframe.setAttribute('allowfullscreen', '');
+            iframe.setAttribute('loading', 'lazy');
+            iframe.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+            iframeContainer.appendChild(iframe);
+            container.appendChild(iframeContainer);
+
+            const navBar = document.createElement('div');
+            navBar.style.cssText = `
+                background: rgba(0,0,0,0.8);
+                padding: 15px;
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+                flex-wrap: wrap;
+                border-top: 2px solid #1a73e8;
+            `;
+
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← Voltar ao Museu';
+            backBtn.style.cssText = `
+                padding: 12px 24px;
+                background: #ff5252;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: bold;
+            `;
+            backBtn.onmouseover = () => backBtn.style.background = '#ff1744';
+            backBtn.onmouseout = () => backBtn.style.background = '#ff5252';
+            backBtn.onclick = () => exitEmbeddingView();
+            navBar.appendChild(backBtn);
+
+            Object.keys(panoramaEnvironments).forEach(key => {
+                if (key !== environmentKey) {
+                    const btn = document.createElement('button');
+                    btn.textContent = panoramaEnvironments[key].name;
+                    btn.style.cssText = `
+                        padding: 10px 20px;
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 13px;
+                    `;
+                    btn.onmouseover = () => btn.style.background = '#45a049';
+                    btn.onmouseout = () => btn.style.background = '#4CAF50';
+                    btn.onclick = () => {
+                        container.remove();
+                        createPanoramaScene(key);
+                    };
+                    navBar.appendChild(btn);
+                }
+            });
+
+            container.appendChild(navBar);
+            document.body.appendChild(container);
+        }
+
+        function exitEmbeddingView() {
+            isPanoramaMode = false;
+            const container = document.getElementById('embeddingContainer');
+            if (container) container.remove();
+            renderer.domElement.style.display = 'block';
+            renderer.setAnimationLoop(animate);
+        }
+
+        function createDetailView() {
+            detailScene = new THREE.Scene();
+
+            // Criar Sky.js
+            const sky = new THREE.Sky();
+            sky.scale.setScalar(450000);
+            detailScene.add(sky);
+
+            // Configurar parâmetros do céu
+            const skyUniforms = sky.material.uniforms;
+            skyUniforms['turbidity'].value = 2;
+            skyUniforms['rayleigh'].value = 0.5;
+            skyUniforms['mieCoefficient'].value = 0.005;
+            skyUniforms['mieDirectionalG'].value = 0.8;
+
+            // Posição do sol (TARDE - sol elevado)
+            const phi = THREE.MathUtils.degToRad(45);
+            const theta = THREE.MathUtils.degToRad(180);
+            const sunPosition = new THREE.Vector3();
+            sunPosition.setFromSphericalCoords(1, phi, theta);
+            skyUniforms['sunPosition'].value.copy(sunPosition);
+
+            detailScene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
+            const floorGeometry = new THREE.PlaneGeometry(50, 50);
+            const floorMaterial = new THREE.MeshStandardMaterial({
+                color: 0x808080,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const detailFloor = new THREE.Mesh(floorGeometry, floorMaterial);
+            detailFloor.rotation.x = -Math.PI / 2;
+            detailFloor.receiveShadow = true;
+            detailFloor.name = 'detailFloor';
+            detailScene.add(detailFloor);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            ambientLight.name = 'detailAmbientLight';
+            detailScene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.name = 'detailDirectionalLight';
+            detailScene.add(directionalLight);
+
+            detailCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const detailCameraHolder = new THREE.Object3D();
+            detailCameraHolder.position.set(0, 1.6, 5);
+            detailCameraHolder.add(detailCamera);
+            detailScene.add(detailCameraHolder);
+            detailScene.detailCameraHolder = detailCameraHolder;
+
+            detailRenderer = new THREE.WebGLRenderer({ antialias: true });
+            detailRenderer.setSize(window.innerWidth, window.innerHeight);
+            detailRenderer.setPixelRatio(window.devicePixelRatio);
+
+            const backButton = document.createElement('button');
+            backButton.innerHTML = '← Voltar ao Museu';
+            backButton.style.cssText = `
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                padding: 12px 24px;
+                background: #ff5252;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                cursor: pointer;
+                z-index: 200;
+            `;
+            backButton.onmouseover = () => backButton.style.background = '#ff1744';
+            backButton.onmouseout = () => backButton.style.background = '#ff5252';
+            backButton.onclick = () => exitDetailView();
+            document.body.appendChild(backButton);
+            backButton.id = 'backButton';
+        }
+
+        function enterDetailView(object) {
+            isInDetailView = true;
+            currentDetailObject = object;
+
+            let styleId = document.getElementById('detailViewStyle');
+            if (!styleId) {
+                const style = document.createElement('style');
+                style.id = 'detailViewStyle';
+                style.textContent = `
+                    .hotspot { display: none !important; pointer-events: none !important; }
+                    .info-panel { display: none !important; pointer-events: none !important; }
+                    #controls { display: none !important; }
+                `;
+                document.head.appendChild(style);
+            }
+
+            infoPanelOpen = false;
+
+            if (!detailScene) {
+                createDetailView();
+            }
+
+            renderer.domElement.style.display = 'none';
+            document.body.appendChild(detailRenderer.domElement);
+            detailRenderer.domElement.id = 'detailCanvas';
+
+            const clonedObject = object.clone();
+            clonedObject.position.set(0, 2.5, 0);
+            clonedObject.scale.set(2, 2, 2);
+            detailScene.add(clonedObject);
+
+            animateDetailView();
+        }
+
+        function exitDetailView() {
+            isInDetailView = false;
+
+            const styleId = document.getElementById('detailViewStyle');
+            if (styleId) styleId.remove();
+
+            const detailCanvas = document.getElementById('detailCanvas');
+            if (detailCanvas) detailCanvas.remove();
+
+            renderer.domElement.style.display = 'block';
+
+            const backButton = document.getElementById('backButton');
+            if (backButton) backButton.remove();
+
+            for (let i = detailScene.children.length - 1; i >= 0; i--) {
+                const child = detailScene.children[i];
+                if (child.name !== 'detailFloor' && !(child instanceof THREE.Light) && !child.children.includes(detailCamera)) {
+                    detailScene.remove(child);
+                }
+            }
+
+            updateHotspots();
+            currentDetailObject = null;
+            renderer.setAnimationLoop(animate);
+        }
+
+        function animateDetailView() {
+            if (!isInDetailView) return;
+
+            const deltaTime = 0.016;
+            const detailCameraHolder = detailScene.detailCameraHolder;
+
+            if (!detailCameraHolder) return;
+
+            // ROTAÇÃO DA CÂMERA
+            if (cameraRotationEnabled) {
+                currentRotationY += (targetRotationY - currentRotationY) * 0.1;
+                currentRotationX += (targetRotationX - currentRotationX) * 0.1;
+
+                detailCameraHolder.rotation.order = 'YXZ';
+                detailCameraHolder.rotation.y = currentRotationY;
+                detailCameraHolder.rotation.x = currentRotationX;
+            }
+
+            // MOVIMENTO - CORRIGIDO
+            velocity.x -= velocity.x * 10.0 * deltaTime;
+            velocity.z -= velocity.z * 10.0 * deltaTime;
+
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            const speed = isRunning ? 50.0 : 25.0;
+
+            if (moveForward || moveBackward) velocity.z -= direction.z * speed * deltaTime;
+            if (moveLeft || moveRight) velocity.x -= direction.x * speed * deltaTime;
+
+            // Calcular movimento baseado na direção da câmera
+            const forward = new THREE.Vector3();
+            const right = new THREE.Vector3();
+
+            forward.set(
+                Math.sin(currentRotationY),
+                0,
+                Math.cos(currentRotationY)
+            );
+
+            right.set(
+                -Math.cos(currentRotationY),
+                0,
+                Math.sin(currentRotationY)
+            );
+
+            const moveAmount = new THREE.Vector3();
+            moveAmount.addScaledVector(forward, velocity.z * deltaTime);
+            moveAmount.addScaledVector(right, velocity.x * deltaTime);
+
+            const newPosX = detailCameraHolder.position.x + moveAmount.x;
+            const newPosZ = detailCameraHolder.position.z + moveAmount.z;
+
+            const MAX_DISTANCE = 50;
+            const distFromCenter = Math.hypot(newPosX, newPosZ);
+
+            if (distFromCenter <= MAX_DISTANCE) {
+                detailCameraHolder.position.x = newPosX;
+                detailCameraHolder.position.z = newPosZ;
+            }
+
+            detailRenderer.render(detailScene, detailCamera);
+            requestAnimationFrame(animateDetailView);
+        }
+
         function init() {
-            // Cena
             scene = new THREE.Scene();
             const textureLoader = new THREE.CubeTextureLoader();
             const skyboxTexture = textureLoader.load([
-                './images/background.jpg', // direita
-                './images/background.jpg', // esquerda
-                './images/background.jpg', // topo
-                './images/background.jpg', // chão
-                './images/background.jpg', // frente
-                './images/background.jpg'  // trás
+                './images/background 2.jpg',
+                './images/background 2.jpg',
+                './images/background 2.jpg',
+                './images/background 2.jpg',
+                './images/background 2.jpg',
+                './images/background 2.jpg'
             ]);
             scene.background = skyboxTexture;
             scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
 
-            // Câmera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-            // Criar um holder para a câmera (para separar movimento de rotação)
             cameraHolder = new THREE.Object3D();
             cameraHolder.position.set(0, 1.6, 5);
             cameraHolder.add(camera);
             scene.add(cameraHolder);
 
-            // Renderer com WebXR
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // Iluminação
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             scene.add(ambientLight);
 
@@ -214,7 +715,6 @@
             directionalLight.castShadow = true;
             scene.add(directionalLight);
 
-            // Chão
             const floorGeometry = new THREE.PlaneGeometry(50, 50);
             const floorMaterial = new THREE.MeshStandardMaterial({
                 color: 0x808080,
@@ -226,30 +726,15 @@
             floor.receiveShadow = true;
             scene.add(floor);
 
-            // Criar ambiente do museu
             createMuseum();
 
-            // Verificar suporte WebXR
             checkXRSupport();
 
-            // Controles de teclado
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
-
-            // Controle de mouse - movimento livre
             document.addEventListener('mousemove', onMouseMove);
-
-            // Redimensionamento
             window.addEventListener('resize', onWindowResize);
 
-            // Info
-            document.getElementById('info').innerHTML = `
-                <h3>🏛️ Museu Virtual WebXR</h3>
-                <p>Mova o mouse para olhar ao redor!</p>
-                <p style="font-size: 11px; margin-top: 10px;">Clique nos ícones 'i' azuis para ver informações</p>
-            `;
-
-            // Inicializar x3 debugger após todos os elementos estarem criados
             try {
                 x3 = new THREEx3({
                     THREE,
@@ -262,16 +747,12 @@
                 console.warn('x3 debugger não disponível:', error);
             }
 
-
-            // Iniciar animação
             renderer.setAnimationLoop(animate);
         }
 
         function createMuseum() {
-            // Paredes
             const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f5dc });
 
-            // Parede traseira
             const backWall = new THREE.Mesh(
                 new THREE.BoxGeometry(20, 5, 0.2),
                 wallMaterial
@@ -283,7 +764,6 @@
                 max: new THREE.Vector3(10, 5, -9.9)
             });
 
-            // Paredes laterais
             const sideWall1 = new THREE.Mesh(
                 new THREE.BoxGeometry(0.2, 5, 20),
                 wallMaterial
@@ -306,23 +786,52 @@
                 max: new THREE.Vector3(10.1, 5, 10)
             });
 
-            // Pedestais com objetos
             createPedestal(-5, 0, -5, 0xff6b6b, "Estação Espacial Internacional", "Uma representação detalhada da ISS, destacando sua arquitetura única e módulos científicos.", "./models/ISS Correctglb.glb", 0.3);
             createPedestal(0, 0, -5, 0x4ecdc4, "Saturn V", "Um dos foguetes mais poderosos já construídos, simbolizando a exploração espacial.", "./models/saturnVCorrect.glb", 0.2);
             createPedestal(5, 0, -5, 0xffe66d, "Ouro Solar", "Inspirada nos raios do sol, esta escultura captura luz e movimento em harmonia perfeita.", "./models/Voyager.glb");
             createPedestal(-5, 0, 0, 0x95e1d3, "Serenidade Verde", "Representa a natureza e crescimento. Observe os detalhes entrelaçados.", "./models/jwst_james_webb_space_telescope.glb", 0.05);
             createPedestal(5, 0, 0, 0xf38181, "Rosa Eterno", "Uma homenagem ao amor e delicadeza. Técnica mista com elementos metálicos.");
 
-            // Quadros nas paredes
             createPainting(-8, 2, -9.8, 0xff6b6b);
             createPainting(-4, 2, -9.8, 0x4ecdc4);
             createPainting(0, 2, -9.8, 0xffe66d);
             createPainting(4, 2, -9.8, 0x95e1d3);
             createPainting(8, 2, -9.8, 0xf38181);
+
+            createPanoramaPortal(-7, 0, 8, 'kennedy', '🚀 Kennedy Space Center');
+            createPanoramaPortal(0, 0, 8, 'iss-lab', '🛰️ ISS Laboratory');
+            createPanoramaPortal(7, 0, 8, 'launch-pad', '🔥 Launch Pad');
+        }
+
+        function createPanoramaPortal(x, y, z, environmentKey, label) {
+            const portalGeometry = new THREE.CylinderGeometry(1, 1, 0.5, 32);
+            const portalMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00ff88,
+                emissive: 0x00ff88,
+                emissiveIntensity: 0.5,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+            portal.position.set(x, y + 0.25, z);
+            portal.userData = {
+                interactive: true,
+                isPortal: true,
+                environmentKey: environmentKey,
+                label: label
+            };
+            scene.add(portal);
+            interactiveObjects.push(portal);
+
+            obstacles.push({
+                type: 'cylinder',
+                x: x,
+                z: z,
+                radius: 1.2
+            });
         }
 
         function createPedestal(x, y, z, color, title, description, modelPath = null, scale = 1) {
-            // Base do pedestal
             const pedestalGeometry = new THREE.CylinderGeometry(0.5, 0.6, 1, 8);
             const pedestalMaterial = new THREE.MeshStandardMaterial({
                 color: 0xcccccc,
@@ -332,7 +841,6 @@
             pedestal.position.set(x, y + 0.5, z);
             scene.add(pedestal);
 
-            // Adicionar colisão cilíndrica para o pedestal
             obstacles.push({
                 type: 'cylinder',
                 x: x,
@@ -340,12 +848,11 @@
                 radius: 0.7
             });
 
-            // Se houver um modelo GLB, carregar; senão usar o objeto padrão
             if (modelPath) {
                 gltfLoader.load(modelPath, (gltf) => {
                     const model = gltf.scene;
                     model.position.set(x, y + 1.5, z);
-                    model.scale.set(scale, scale, scale); // Ajustar escala conforme necessário
+                    model.scale.set(scale, scale, scale);
                     model.userData = {
                         rotate: true,
                         interactive: true,
@@ -356,7 +863,6 @@
                     interactiveObjects.push(model);
                 }, undefined, (error) => {
                     console.error('Erro ao carregar modelo:', modelPath, error);
-                    // Fallback: criar objeto padrão
                     createDefaultObject(x, y, z, color, title, description);
                 });
             } else {
@@ -384,14 +890,12 @@
         }
 
         function createPainting(x, y, z, color) {
-            // Moldura
             const frameGeometry = new THREE.BoxGeometry(1.5, 2, 0.1);
             const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
             const frame = new THREE.Mesh(frameGeometry, frameMaterial);
             frame.position.set(x, y, z);
             scene.add(frame);
 
-            // "Pintura"
             const paintingGeometry = new THREE.PlaneGeometry(1.3, 1.8);
             const paintingMaterial = new THREE.MeshStandardMaterial({ color: color });
             const painting = new THREE.Mesh(paintingGeometry, paintingMaterial);
@@ -445,11 +949,17 @@
                     break;
                 case 'ArrowRight':
                 case 'KeyD':
+                    console.log('Direita pressionada');
                     moveRight = true;
                     break;
                 case 'ShiftLeft':
                 case 'ShiftRight':
                     isRunning = true;
+                    isShiftPressed = true;
+                    break;
+                case 'Escape':
+                    cameraRotationEnabled = !cameraRotationEnabled;
+                    console.log('Rotação da câmera:', cameraRotationEnabled ? 'ativada' : 'desativada');
                     break;
             }
         }
@@ -475,18 +985,17 @@
                 case 'ShiftLeft':
                 case 'ShiftRight':
                     isRunning = false;
+                    isShiftPressed = false;
                     break;
             }
         }
 
         function onMouseMove(event) {
-            // Normalizar posição do mouse (-1 a 1)
             mouseX = (event.clientX / window.innerWidth) * 2 - 1;
             mouseY = (event.clientY / window.innerHeight) * 2 - 1;
 
-            // Calcular rotação alvo - 360 graus de rotação horizontal
-            targetRotationY = -mouseX * Math.PI; // 360 graus de range horizontal (antes era 180)
-            targetRotationX = -mouseY * Math.PI * 0.25; // 90 graus de range vertical
+            targetRotationY = -mouseX * Math.PI;
+            targetRotationX = -mouseY * Math.PI * 0.25;
         }
 
         function onWindowResize() {
@@ -499,21 +1008,20 @@
             const time = performance.now();
             const delta = (time - prevTime) / 1000;
 
-            // Suavizar rotação da câmera
-            currentRotationY += (targetRotationY - currentRotationY) * 0.1;
-            currentRotationX += (targetRotationX - currentRotationX) * 0.1;
+            const rotationSpeed = isShiftPressed ? rotationSpeedSlow : rotationSpeedNormal;
 
-            // Limitar pitch (rotação vertical)
+            if (cameraRotationEnabled && !infoPanelOpen) {
+                currentRotationY += (targetRotationY - currentRotationY) * rotationSpeed;
+                currentRotationX += (targetRotationX - currentRotationX) * rotationSpeed;
+            }
+
             currentRotationX = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, currentRotationX));
 
-            // Aplicar rotação apenas na câmera, não no holder
-            // Usar ordem de rotação YXZ para evitar roll (inclinação lateral)
             camera.rotation.order = 'YXZ';
             camera.rotation.y = currentRotationY;
             camera.rotation.x = currentRotationX;
-            camera.rotation.z = 0; // Forçar roll zero (sem inclinação lateral)
+            camera.rotation.z = 0;
 
-            // Movimento
             velocity.x -= velocity.x * 10.0 * delta;
             velocity.z -= velocity.z * 10.0 * delta;
 
@@ -523,28 +1031,26 @@
 
             const speed = isRunning ? 50.0 : 25.0;
 
-            if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
-            if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+            if (!infoPanelOpen) {
+                if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+            }
 
-            // Calcular movimento baseado na direção da câmera (yaw apenas, ignorando pitch)
             const forward = new THREE.Vector3();
             const right = new THREE.Vector3();
 
-            // Vetor forward baseado no yaw da câmera (invertido para corrigir direção)
             forward.set(
                 Math.sin(currentRotationY),
                 0,
                 Math.cos(currentRotationY)
             );
 
-            // Vetor right perpendicular ao forward (invertido para corrigir direção)
             right.set(
                 -Math.cos(currentRotationY),
                 0,
                 Math.sin(currentRotationY)
             );
 
-            // Calcular nova posição baseada na direção da câmera
             const moveAmount = new THREE.Vector3();
             moveAmount.addScaledVector(forward, velocity.z * delta);
             moveAmount.addScaledVector(right, velocity.x * delta);
@@ -552,7 +1058,6 @@
             const newPosX = cameraHolder.position.x + moveAmount.x;
             const newPosZ = cameraHolder.position.z + moveAmount.z;
 
-            // Verificar colisões e aplicar movimento
             if (!checkCollision(newPosX, cameraHolder.position.z)) {
                 cameraHolder.position.x = newPosX;
             } else {
@@ -565,7 +1070,6 @@
                 velocity.z = 0;
             }
 
-            // Animar objetos
             scene.traverse((child) => {
                 if (child.userData.rotate) {
                     child.rotation.y += delta * 0.5;
@@ -578,21 +1082,17 @@
                 renderer.render(scene, camera);
             })
 
-            // Atualizar posição dos hotspots
             updateHotspots();
         }
 
         function updateHotspots() {
             interactiveObjects.forEach(obj => {
-                // Calcular distância do objeto à câmera
                 const distance = camera.position.distanceTo(obj.position);
 
-                // Só mostrar hotspots para objetos próximos (até 15 unidades)
                 if (distance > 15) {
                     const hotspot = document.querySelector(`[data-object="${obj.uuid}"]`);
                     if (hotspot) hotspot.style.display = 'none';
 
-                    // Remover painel se o objeto estiver longe
                     const panel = document.querySelector(`.info-panel[data-object="${obj.uuid}"]`);
                     if (panel) panel.remove();
                     return;
@@ -601,12 +1101,10 @@
                 const vector = obj.position.clone();
                 vector.project(camera);
 
-                // Verificar se está na frente da câmera
                 if (vector.z > 1) {
                     const hotspot = document.querySelector(`[data-object="${obj.uuid}"]`);
                     if (hotspot) hotspot.style.display = 'none';
 
-                    // Remover painel se o objeto estiver atrás
                     const panel = document.querySelector(`.info-panel[data-object="${obj.uuid}"]`);
                     if (panel) panel.remove();
                     return;
@@ -624,7 +1122,6 @@
                     hotspot.dataset.object = obj.uuid;
                     hotspot.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        // Pegar posição real do hotspot no momento do clique
                         const rect = hotspot.getBoundingClientRect();
                         const centerX = rect.left + rect.width / 2;
                         const centerY = rect.top + rect.height / 2;
@@ -640,8 +1137,14 @@
         }
 
         function showInfoPanel(object, hotspotX, hotspotY) {
-            // Remover painéis existentes
+            if (object.userData.isPortal) {
+                createPanoramaScene(object.userData.environmentKey);
+                return;
+            }
+
             document.querySelectorAll('.info-panel').forEach(p => p.remove());
+
+            infoPanelOpen = true;
 
             const panel = document.createElement('div');
             panel.className = 'info-panel';
@@ -652,6 +1155,7 @@
             closeBtn.innerHTML = '×';
             closeBtn.onclick = function () {
                 panel.remove();
+                infoPanelOpen = false;
             };
 
             const title = document.createElement('h3');
@@ -661,36 +1165,44 @@
             description.textContent = object.userData.description;
 
             const button = document.createElement('button');
-            button.textContent = 'Ver em tamanho real';
+            button.textContent = 'Ver em 3D';
+            button.style.cssText = `
+                margin-top: 10px;
+                padding: 8px 16px;
+                background: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                width: 100%;
+            `;
+            button.onclick = () => {
+                enterDetailView(object);
+            };
 
             panel.appendChild(closeBtn);
             panel.appendChild(title);
             panel.appendChild(description);
             panel.appendChild(button);
 
-            // Adicionar ao DOM primeiro para calcular dimensões
             document.body.appendChild(panel);
 
-            // Agora pegar dimensões reais
             const panelWidth = panel.offsetWidth;
             const panelHeight = panel.offsetHeight;
             const padding = 15;
 
-            // Tentar posicionar à direita do hotspot
             let panelX = hotspotX + padding;
             let panelY = hotspotY - (panelHeight / 2);
 
-            // Se não couber à direita, colocar à esquerda
             if (panelX + panelWidth > window.innerWidth - 10) {
                 panelX = hotspotX - panelWidth - padding;
             }
 
-            // Se não couber à esquerda também, forçar dentro da tela
             if (panelX < 10) {
                 panelX = 10;
             }
 
-            // Garantir que não saia verticalmente
             if (panelY < 10) {
                 panelY = 10;
             }
@@ -703,7 +1215,6 @@
         }
 
         function checkCollision(x, z) {
-            // Verificar colisão com paredes
             for (let wall of walls) {
                 const expandedMin = {
                     x: wall.min.x - playerRadius,
@@ -720,15 +1231,12 @@
                 }
             }
 
-            // Verificar colisão com obstáculos (pedestais)
             for (let obstacle of obstacles) {
                 if (obstacle.type === 'cylinder') {
-                    // Calcular distância entre jogador e obstáculo
                     const dx = x - obstacle.x;
                     const dz = z - obstacle.z;
                     const distance = Math.sqrt(dx * dx + dz * dz);
 
-                    // Verificar se há colisão (soma dos raios)
                     if (distance < obstacle.radius + playerRadius) {
                         return true;
                     }
