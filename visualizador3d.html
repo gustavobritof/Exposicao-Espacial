@@ -11,7 +11,57 @@
     <script src="https://unpkg.com/aframe-sun-sky@3.0.3/dist/aframe-sun-sky.min.js"></script>
     <script
         src="https://unpkg.com/aframe-environment-component@1.5.x/dist/aframe-environment-component.min.js"></script>
+    <!-- <script>
+        AFRAME.registerComponent('ship-controls', {
+            init: function () {
+                this.velocity = { x: 0, y: 0, z: 0 };
+                this.speed = 0.05;
+                this.keys = {};
+                this.camera = document.querySelector('[orbit-controls]');
 
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key.toLowerCase()] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                });
+            },
+            tick: function () {
+                let pos = this.el.getAttribute('position');
+
+                // W/ArrowUp - frente (Z negativo)
+                if (this.keys['w'] || this.keys['arrowup']) {
+                    pos.x -= this.speed;
+                }
+                // S/ArrowDown - trás (Z positivo)
+                if (this.keys['s'] || this.keys['arrowdown']) {
+                    pos.x += this.speed;
+                }
+                // A/ArrowLeft - esquerda (X negativo)
+                if (this.keys['a'] || this.keys['arrowleft']) {
+                    pos.z -= this.speed;
+                }
+                // D/ArrowRight - direita (X positivo)
+                if (this.keys['d'] || this.keys['arrowright']) {
+                    pos.z += this.speed;
+                }
+
+                this.el.setAttribute('position', pos);
+
+                // Atualiza a câmera para seguir o navio
+                if (this.camera) {
+                    this.camera.setAttribute('orbit-controls', `
+                        target: ${pos.x} ${pos.y} ${pos.z};
+                        minDistance: 2; 
+                        maxDistance: 180;
+                        rotateSpeed: 0.6;
+                        initialPosition: 8 8 3;
+                        rotationSpeed: 0.5;
+                    `);
+                }
+            }
+        });
+    </script> -->
 </head>
 
 <body>
@@ -25,19 +75,21 @@
           minDistance: 2; 
           maxDistance: 180;
           rotateSpeed: 0.6;
-          initialPosition: -4 6 2;
+          initialPosition: -4 6 5;
           rotationSpeed: 0.5;
         "> </a-entity>
+
+
         <!-- 
         <a-grid></a-grid> -->
-        <a-ocean color="lightblue" width="200" depth="200" density="100" position="0 4.4 0" speed="0.2"></a-ocean>
+        <a-ocean width="1000" depth="1000" density="500" color="#1e90ff" opacity="0.5" amplitude="0.5"
+            amplitude-variance="0.01" speed="0.2" speed-variance="0.00001" position="0 4.4 0"></a-ocean>
 
 
         <!-- <a-tube path="5 0 5, 5 0 -5, -5 0 -5" radius="0.5" material="color: red"></a-tube> -->
 
 
-        <a-entity position="0 4 -3" gltf-model="#goingMerry" color="mediumseagreen"
-            trail="color: white; duration: 3"></a-entity>
+        <a-entity position="0 4 -3" gltf-model="#goingMerry" color="mediumseagreen" ship-controls></a-entity>
 
     </a-scene>
 </body>
