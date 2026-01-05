@@ -66,6 +66,10 @@
                             align="center" width="2.2" position="0 0.2 0.01" text=""></a-text>
                         <a-image id="close-btn" src="#crossIcon" class="clickable" position="1.1 0.6 0.001" width="0.25"
                             height="0.25" material="" geometry=""></a-image>
+                        <a-box id="view-hubble-btn" position="0 -0.5 0.05" width="1.8" height="0.3" depth="0.05"
+                            color="#ff6600" material="emissive: #ff6600; emissiveIntensity: 0.5;"></a-box>
+                        <a-text value="Ver Hubble em 3D" position="0 -0.5 0.1" align="center" anchor="center"
+                            color="#ffffff" font-size="20"></a-text>
                     </a-plane>
                 </a-entity>
             </template>
@@ -79,6 +83,10 @@
                             align="center" width="2.2" position="0 0.2 0.01"></a-text>
                         <a-image id="close-btn" src="#crossIcon" class="clickable" position="1.1 0.6 0.001" width="0.25"
                             height="0.25"></a-image>
+                        <a-box id="view-voyager-btn" position="0 -0.5 0.05" width="1.8" height="0.3" depth="0.05"
+                            color="#ff6600" material="emissive: #ff6600; emissiveIntensity: 0.5;"></a-box>
+                        <a-text value="Ver Voyager em 3D" position="0 -0.5 0.1" align="center" anchor="center"
+                            color="#ffffff" font-size="20"></a-text>
                     </a-plane>
                 </a-entity>
             </template>
@@ -269,46 +277,86 @@
     </a-scene>
 
     <script>
-        // Lógica de funcionamento dos Hotspots (Russa/UMD adaptada)
+        // Lógica de funcionamento dos Hotspots
         window.onload = function () {
 
             const buttons = document.querySelectorAll("[data-triggerable-button]");
 
             buttons.forEach((btn) => {
-                // Função para abrir o painel
                 const openPanel = function () {
                     const id = btn.getAttribute("data-triggerable-button");
                     const template = document.querySelector(`#infoPanel${id}`);
-                    const container = btn.nextElementSibling; // O infoPanelContainer logo abaixo
+                    const container = btn.nextElementSibling;
 
-                    // 1. Fecha qualquer outro painel aberto antes
                     hideAllInfoPanels();
 
-                    // 2. Injeta o conteúdo do template no container correspondente
                     const clone = document.importNode(template.content, true);
                     container.appendChild(clone);
 
-                    // 3. Esconde o ícone azul enquanto o painel estiver aberto
                     btn.setAttribute("visible", false);
 
-                    // 4. Configura o botão de fechar (X) que foi criado agora
                     setTimeout(() => {
                         const closeBtn = container.querySelector("#close-btn");
                         if (closeBtn) {
                             closeBtn.addEventListener("click", (e) => {
+                                e.stopPropagation();
                                 hideAllInfoPanels();
+                            });
+                        }
+
+                        // Botão para ir à cena 2 (Galeria)
+                        const viewBtn = container.querySelector("[id^='view-']");
+                        if (viewBtn) {
+                            viewBtn.addEventListener("click", (e) => {
+                                e.stopPropagation();
+                                const modelType = viewBtn.id.replace('view-', '').replace('-btn', '');
+                                navegarParaCena2(modelType);
                             });
                         }
                     }, 100);
                 };
 
-                // Event listener para clique A-Frame (cursor)
                 btn.addEventListener("click", openPanel);
-
-                // Event listener para clique do mouse normal
                 btn.addEventListener("mousedown", openPanel);
             });
         };
+
+        function navegarParaCena2(modelType) {
+            // Map com escala e rotação de cada modelo
+            const modelConfigs = {
+                'hubble': {
+                    scale: '0.0003 0.0003 0.0003',
+                    rotation: '0 0 0'
+                },
+                'jwst': {
+                    scale: '0.05 0.05 0.05',
+                    rotation: '0 0 0'
+                },
+                'saturnv': {
+                    scale: '0.2 0.2 0.2',
+                    rotation: '0 0 0'
+                },
+                'iss': {
+                    scale: '0.1 0.1 0.1',
+                    rotation: '0 0 0'
+                },
+                'voyager': {
+                    scale: '0.15 0.15 0.15',
+                    rotation: '0 0 45'
+                }
+            };
+
+            // Armazena a informação no sessionStorage
+            sessionStorage.setItem('modeloExibicao', modelType);
+            sessionStorage.setItem('modeloConfig', JSON.stringify(modelConfigs[modelType]));
+
+            // Aplica fade out
+            document.body.style.opacity = '0';
+
+            setTimeout(() => {
+                window.location.href = 'index-simples02.html';
+            }, 500);
+        }
     </script>
 </body>
 

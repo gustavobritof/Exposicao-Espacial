@@ -20,6 +20,14 @@
             /* Fundo preto ajuda na transição */
         }
     </style>
+
+    <script>
+        // Recupera qual modelo deve ser exibido
+        const modeloExibicao = sessionStorage.getItem('modeloExibicao');
+
+        // Define qual modelo renderizar
+        let modeloAtual = modeloExibicao || 'hubble'; // Padrão: hubble
+    </script>
 </head>
 
 <body>
@@ -28,6 +36,7 @@
     <a-scene id="scene03">
         <a-assets>
             <a-asset-item id="hubble" src="models/hubble.glb"></a-asset-item>
+            <a-asset-item id="voyager" src="models/Voyager 1.glb"></a-asset-item>
         </a-assets>
 
         <a-entity look-controls="enabled:false" orbit-controls="
@@ -53,10 +62,9 @@
         <!-- <a-plane rotation="-90 0.4 0" width="30" height="30" color="#16213e" roughness="0.3" metalness="0.5"
             shadow></a-plane> -->
 
-        <!-- MODELO DINÂMICO (Centro) -->
-        <!-- <a-entity id="viewer-model-holder" position="0 1.5 -2">
-            <a-light type="ambient" color="#ffffff" intensity="1"></a-light>
-        </a-entity> -->
+        <!-- MODELO DINÂMICO (muda conforme clicado) -->
+        <a-entity id="dynamic-model" position="0 4 0" scale="0.003 0.003 0.003"></a-entity>
+        </a-entity>
 
         <a-entity position="0 4 0" gltf-model="#hubble" scale="0.003 0.003 0.003"></a-entity>
 
@@ -94,6 +102,19 @@
 
             this.el.setObject3D('mesh', this.grid);
         }
+    });
+
+    // Carrega o modelo dinamicamente
+    window.addEventListener('load', function () {
+        const dynamicModel = document.getElementById('dynamic-model');
+        const modelAsset = document.getElementById(modeloAtual);
+
+        if (modelAsset) {
+            dynamicModel.setAttribute('gltf-model', `#${modeloAtual}`);
+        }
+
+        // Atualiza o título
+        document.getElementById('cena-titulo').textContent = `Cena 3D - ${modeloAtual.toUpperCase()}`;
     });
 </script>
 

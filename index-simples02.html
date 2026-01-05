@@ -25,6 +25,14 @@
     <h1 id="cena-titulo">Cena 2</h1>
 
     <a-scene id="scene02" shadow="type: pcfs">
+        <a-assets>
+            <a-asset-item id="hubble-asset" src="models/hubble.glb"></a-asset-item>
+            <a-asset-item id="voyager-asset" src="models/Voyager 1.glb"></a-asset-item>
+            <a-asset-item id="jwst-asset" src="models/jwst.glb"></a-asset-item>
+            <a-asset-item id="saturnv-asset" src="models/saturnv.glb"></a-asset-item>
+            <a-asset-item id="iss-asset" src="models/iss.glb"></a-asset-item>
+        </a-assets>
+
 
         <a-camera position="0 1.6 0">
             <a-cursor></a-cursor>
@@ -60,7 +68,10 @@
         <a-cylinder color="#8b7355" radius="0.85" height="0.5" position="0 0.0 -3" shadow></a-cylinder>
         <a-cylinder color="#8b7355" radius="0.9" height="0.12" position="0 0.5 -3" shadow
             emissive="#8b7355"></a-cylinder>
-
+        <!-- MODELO 3D DINÂMICO (muda conforme selecionado) -->
+        <a-entity id="dynamic-model-pedestal" position="0 0.8 -3" scale="0.005 0.005 0.005" rotation="0 0 0"
+            cursor-hover animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
+        </a-entity>
 
         <!-- Título Principal da Galeria -->
         <a-text id="gallery-main-title" value="" align="center" anchor="center" position="0 3 -7.8" color="#2c5f7f"
@@ -104,12 +115,61 @@
                 font-weight="bold"></a-text>
         </a-entity>
 
-
+        <!-- <a-entity position="0 1.6 -2" scale="0.5 0.5 0.5">
+            <a-box id="go-to-scene3" color="#ff6600" width="2" height="0.8" depth="0.2"
+                material="emissive: #ff6600; emissiveIntensity: 0.5;"></a-box>
+            <a-text value="Visualizar Modelo 3D" position="0 0 0.15" align="center" anchor="center" color="#ffffff"
+                font-size="30"></a-text>
+        </a-entity> -->
 
     </a-scene>
 
+
     <script>
-        document.getElementById('portal-cena1').addEventListener('click', () => irParaCena(1));
+        // Recupera o modelo selecionado e renderiza
+        window.addEventListener('load', () => {
+            const modelType = sessionStorage.getItem('modeloExibicao') || 'hubble';
+            const configStr = sessionStorage.getItem('modeloConfig');
+            const config = configStr ? JSON.parse(configStr) : { scale: '0.005 0.005 0.005', rotation: '0 0 0' };
+
+            const dynamicModel = document.getElementById('dynamic-model-pedestal');
+
+            // Map de modelos para IDs dos assets
+            const modelMap = {
+                'hubble': 'hubble-asset',
+                'voyager': 'voyager-asset',
+                'jwst': 'jwst-asset',
+                'saturnv': 'saturnv-asset',
+                'iss': 'iss-asset'
+            };
+
+            const assetId = modelMap[modelType];
+            if (assetId) {
+                dynamicModel.setAttribute('gltf-model', `#${assetId}`);
+                dynamicModel.setAttribute('scale', config.scale);
+                dynamicModel.setAttribute('rotation', config.rotation);
+            }
+
+            // Atualiza título da galeria
+            const titles = {
+                'hubble': 'TELESCÓPIO HUBBLE',
+                'voyager': 'SONDA VOYAGER 1',
+                'jwst': 'JAMES WEBB SPACE TELESCOPE',
+                'saturnv': 'FOGUETE SATURN V',
+                'iss': 'ESTAÇÃO ESPACIAL INTERNACIONAL'
+            };
+
+            document.getElementById('gallery-main-title').setAttribute('value', titles[modelType] || 'MUSEU ESPACIAL');
+        });
+
+        // Botão para ir à Cena 3
+        document.getElementById('go-to-scene3').addEventListener('click', () => {
+            const modelType = sessionStorage.getItem('modeloExibicao') || 'hubble';
+            document.body.style.opacity = '0';
+            setTimeout(() => {
+                window.location.href = 'index-simples03.html';
+            }, 500);
+        });
     </script>
 
 
