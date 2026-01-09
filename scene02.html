@@ -7,7 +7,7 @@
     <title>Museu Espacial VR</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src="sceneManager.js"></script>
-
+    <link rel="stylesheet" href="screenloader.css">
     <!-- Componente para texto curvo -->
     <script>
         // Componente de transição com singularidade
@@ -114,10 +114,10 @@
             overflow: hidden;
             transition: opacity 0.8s ease-in-out;
             opacity: 0;
-            /* Começa invisível para o fade-in do load */
             background-color: black;
-            /* Fundo preto ajuda na transição */
         }
+
+
 
         #dialog-overlay {
             position: fixed;
@@ -170,6 +170,24 @@
 </head>
 
 <body>
+    <div id="custom-loader">
+        <div class="stars"></div>
+
+        <div class="orbit-container">
+            <div class="orbit orbit-1"></div>
+            <div class="orbit orbit-2"></div>
+            <div class="orbit orbit-3"></div>
+            <div class="planet"></div>
+            <div class="satellite"></div>
+        </div>
+
+        <div class="loader-text">CARREGANDO</div>
+
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="progress-text" id="progress-text">0%</div>
+    </div>
     <h1 id="cena-titulo">Cena 2</h1>
 
     <!-- Overlay para diálogos expansíveis -->
@@ -192,6 +210,30 @@
 
 
             <img src="images/ceu-noturno-estrelado-azul-e-branco.jpg" id="sky">
+            <img id="hotspot-img" src="images/HotspotIcon.png">
+            <img id="crossIcon" src="https://img.icons8.com/?size=100&id=43925&format=png&color=FFFFFF" alt="Fechar">
+
+            <!-- Template do painel 3D -->
+            <template id="infoPanel3D">
+
+
+
+                <a-entity rotation="0 -90 0" position="0.96 0 -1.65">
+                    <a-plane color="#1a1a1a" height="1.5" width="2.5" position="" material="" geometry="">
+                        <a-text
+                            value="VISUALIZADOR 3D\n\nVeja o modelo em detalhes com visualizacao 360 graus e controles completos."
+                            align="center" width="2.2" position="0 0.2 0.01" text=""></a-text>
+                        <a-image id="close-btn-3d" src="#crossIcon" class="clickable" position="1.1 0.6 0.001"
+                            width="0.25" cursor-hover="" height="0.25" material="" geometry=""></a-image>
+                        <a-box id="view-3d-btn" position="0 -0.5 0.05" width="1.8" height="0.3" depth="0.05"
+                            class="clickable" color="#ff6600" material="emissive: #ff6600; emissiveIntensity: 0.5"
+                            cursor-hover="" geometry="">
+                            <a-text value="Ver em 3D" position="0 0 0.04" align="center" anchor="center" color="#ffffff"
+                                font-size="16" text=""></a-text>
+                        </a-box>
+                    </a-plane>
+                </a-entity>
+            </template>
             <!-- Imagens mockup para os painéis -->
             <img src="images/background.jpg" id="panel-historia-img" crossorigin="anonymous">
             <img src="images/background.jpg" id="panel-tecnologia-img" crossorigin="anonymous">
@@ -200,8 +242,10 @@
         </a-assets>
 
 
-        <a-camera position="0 1.6 0" cursor="rayOrigin: mouse">
-            <a-cursor></a-cursor>
+        <a-camera position="0 1.6 0" cursor="rayOrigin: mouse" raycaster="objects: .clickable; far: 20">
+            <a-cursor color="#ffffff" fuse="true" fuse-timeout="2000"
+                animation__fusing="property: scale; startEvents: fusing; easing: easeInCubic; dur: 2000; from: 1 1 1; to: 0.1 0.1 0.1"
+                animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCubic; dur: 200; to: 1 1 1"></a-cursor>
         </a-camera>
 
         <!-- Iluminação Galeria -->
@@ -253,13 +297,20 @@
 
 
         <!-- Pedestal no canto -->
-        <a-cylinder color="#8b7355" radius="0.6" height="0.4" position="-4 0.0 -2" shadow></a-cylinder>
-        <a-cylinder color="#8b7355" radius="0.65" height="0.1" position="-4 0.4 -2" shadow
+        <a-cylinder color="#8b7355" radius="0.8" height="1" position="-4 0.5 -2" shadow></a-cylinder>
+        <a-cylinder color="#8b7355" radius="0.85" height="0.15" position="-4 1.063 -2" shadow
             emissive="#8b7355"></a-cylinder>
         <!-- MODELO 3D DINÂMICO no canto -->
-        <a-entity id="dynamic-model-pedestal" class="clickable" position="-4 0.7 -2" scale="0.004 0.004 0.004"
+        <a-entity id="dynamic-model-pedestal" class="clickable" position="-4 1.474 -2" scale="0.004 0.004 0.004"
             rotation="0 45 0" cursor-hover
             animation="property: rotation; to: 0 405 0; loop: true; dur: 8000; easing: linear">
+        </a-entity>
+
+        <!-- Hotspot para visualização 3D -->
+        <a-entity id="hotspot-3d-container" position="-3.1 0.9 -1.93" rotation="0 90 0">
+            <a-image id="hotspot-3d-icon" src="#hotspot-img" class="clickable" data-triggerable-button="3d" cursor-hover
+                billboard scale="0.5 0.5 0.5" material="depthTest: false; shader: flat" look-at="[camera]"></a-image>
+            <a-entity id="infoPanelContainer3D" position="0 0.5 0" rotation="0 120 0"></a-entity>
         </a-entity>
 
         <!-- Título Principal da Galeria com Placa Arredondada -->
@@ -307,12 +358,60 @@
         <a-entity position="0 2.5 -1.79" rotation="0 -160 0" id="CurvedFuturo"
             curved-text="value: FUTURO; radius: 4.75; arc: 30; ; fontSize: 0.25"></a-entity>
 
-        <!-- <a-entity position="0 1.6 -2" scale="0.5 0.5 0.5">
-            <a-box id="go-to-scene3" color="#ff6600" width="2" height="0.8" depth="0.2"
-                material="emissive: #ff6600; emissiveIntensity: 0.5;"></a-box>
-            <a-text value="Visualizar Modelo 3D" position="0 0 0.15" align="center" anchor="center" color="#ffffff"
-                font-size="30"></a-text>
-        </a-entity> -->
+        <a-entity position="-2.9 1.6 -5.5" rotation="0 45 0" id="portal">
+
+            <!-- Anéis orbitantes ao redor do portal - Buraco Negro -->
+            <!-- Anel externo - disco de acreção -->
+            <a-torus color="#E0E0E0" radius="1.3" radius-tubular="0.02"
+                material="emissive: #FFFFFF; emissiveIntensity: 0.4; opacity: 0.6; transparent: true"
+                animation="property: rotation; to: 0 0 360; loop: true; dur: 4000; easing: linear">
+            </a-torus>
+
+            <!-- Anel interno escuro -->
+            <a-torus color="#424242" radius="1.1" radius-tubular="0.015"
+                material="emissive: #616161; emissiveIntensity: 0.3; opacity: 0.7; transparent: true"
+                animation="property: rotation; to: 0 0 -360; loop: true; dur: 3000; easing: linear">
+            </a-torus>
+
+            <!-- Partículas/esferas pequenas orbitando -->
+            <a-entity rotation="0 0 0"
+                animation="property: rotation; to: 0 0 360; loop: true; dur: 5000; easing: linear">
+                <a-sphere color="#E0E0E0" radius="0.035" position="1.2 0 0"
+                    material="emissive: #FFFFFF; emissiveIntensity: 0.6; opacity: 0.8; transparent: true"></a-sphere>
+                <a-sphere color="#9E9E9E" radius="0.035" position="-1.2 0 0"
+                    material="emissive: #BDBDBD; emissiveIntensity: 0.5; opacity: 0.8; transparent: true"></a-sphere>
+            </a-entity>
+
+            <!-- Brilho/glow principal ao redor do portal -->
+            <a-ring color="#E0E0E0" radius-inner="0.98" radius-outer="1.05"
+                material="emissive: #FFFFFF; emissiveIntensity: 0.4; opacity: 0.3; transparent: true; side: double"
+                animation="property: material.emissiveIntensity; from: 0.3; to: 0.7; loop: true; dur: 1500; dir: alternate; easing: easeInOutSine">
+            </a-ring>
+
+            <!-- Luz pontual do portal -->
+            <a-light type="point" intensity="1" color="#E0E0E0" distance="3" position="0 0 0.2"
+                animation="property: intensity; from: 0.8; to: 1.5; loop: true; dur: 1500; dir: alternate; easing: easeInOutSine">
+            </a-light>
+
+            <a-circle radius="1" class="clickable" segments="64" vr-link="href: scene01.html"
+                material="shader: portal; pano: #skyTexture; side: double">
+            </a-circle>
+
+            <!-- Placa de informação estilizada -->
+            <a-entity position="-3 0 -0.05" rotation="0 180 0">
+                <a-plane color="#1a1a1a" width="3" height="0.4"
+                    material="opacity: 0.9; emissive: #2a2a2a; emissiveIntensity: 0.3"
+                    animation="property: material.emissiveIntensity; from: 0.2; to: 0.4; loop: true; dur: 2000; dir: alternate; easing: easeInOutSine">
+                </a-plane>
+                <!-- Borda da placa -->
+
+                <a-text value=" <- Voltar p/ Tela Inicial" align="right" position="0 0 0.01" width="3" color="#FFFFFF"
+                    font="roboto">
+                </a-text>
+            </a-entity>
+
+        </a-entity>
+
 
     </a-scene>
 
@@ -341,10 +440,84 @@
             })
             .catch(err => console.error('Erro ao carregar modelsConfig.json:', err));
 
+        // Função global para esconder painel 3D
+        function hideInfoPanel3D() {
+            const container = document.querySelector('#infoPanelContainer3D');
+            if (container) {
+                container.innerHTML = '';
+                const hotspotIcon = document.querySelector('#hotspot-3d-icon');
+                if (hotspotIcon) hotspotIcon.setAttribute('visible', true);
+            }
+        }
+
+        // Função global para abrir painel 3D
+        function openPanel3D(event) {
+            const template = document.querySelector('#infoPanel3D');
+            const container = document.querySelector('#infoPanelContainer3D');
+
+            if (!container || !template) {
+                console.log('Container ou template não encontrado');
+                return;
+            }
+
+            hideInfoPanel3D();
+
+            const clone = document.importNode(template.content, true);
+            container.appendChild(clone);
+
+            const hotspotIcon = document.querySelector('#hotspot-3d-icon');
+            if (hotspotIcon) hotspotIcon.setAttribute('visible', false);
+
+            setTimeout(() => {
+                const closeBtn = container.querySelector('#close-btn-3d');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        hideInfoPanel3D();
+                    });
+                }
+
+                const viewBtn = container.querySelector('#view-3d-btn');
+                if (viewBtn) {
+                    viewBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        navegarParaCena3();
+                    });
+                }
+            }, 100);
+        }
+
         // Recupera o modelo selecionado e renderiza
         window.addEventListener('load', () => {
             const modelType = sessionStorage.getItem('modeloExibicao') || 'hubble';
             currentModelType = modelType;
+
+            // Configura hotspot 3D
+            const hotspot3D = document.querySelector('[data-triggerable-button="3d"]');
+            if (hotspot3D) {
+                let fuseTimeout = null;
+
+                hotspot3D.addEventListener('click', (e) => {
+                    console.log('Hotspot 3D clicado');
+                    if (fuseTimeout) {
+                        clearTimeout(fuseTimeout);
+                        fuseTimeout = null;
+                    }
+                    openPanel3D(e);
+                });
+
+                hotspot3D.addEventListener('fusing', (e) => {
+                    if (fuseTimeout) clearTimeout(fuseTimeout);
+                    fuseTimeout = setTimeout(() => openPanel3D(e), 2000);
+                });
+
+                hotspot3D.addEventListener('mouseleave', () => {
+                    if (fuseTimeout) {
+                        clearTimeout(fuseTimeout);
+                        fuseTimeout = null;
+                    }
+                });
+            }
 
             // Aguarda o JSON carregar antes de aplicar configs
             const checkConfig = setInterval(() => {
@@ -383,16 +556,37 @@
                         'voyager': 'SONDA VOYAGER 1',
                         'jwst': 'JAMES WEBB SPACE TELESCOPE',
                         'saturnv': 'FOGUETE SATURN V',
-                        'iss': 'ESTAÇÃO ESPACIAL INTERNACIONAL'
+                        'iss': 'ESTACAO ESPACIAL INTERNACIONAL'
                     };
 
                     document.getElementById('gallery-main-title').setAttribute('value', titles[modelType] || 'MUSEU ESPACIAL');
 
-                    // Adicionar evento de clique no modelo para ir para scene03
+                    // Adicionar evento de clique no modelo para abrir o painel 3D
                     if (dynamicModel) {
-                        dynamicModel.addEventListener('click', () => {
-                            navegarParaCena3();
+                        console.log('Adicionando evento de clique ao modelo');
+
+                        dynamicModel.addEventListener('click', (e) => {
+                            console.log('Modelo 3D clicado!');
+                            e.stopPropagation();
+                            openPanel3D(e);
                         });
+
+                        // Adicionar suporte a fusing no modelo
+                        let modelFuseTimeout = null;
+
+                        dynamicModel.addEventListener('fusing', (e) => {
+                            console.log('Modelo fusing');
+                            if (modelFuseTimeout) clearTimeout(modelFuseTimeout);
+                            modelFuseTimeout = setTimeout(() => openPanel3D(e), 2000);
+                        });
+
+                        dynamicModel.addEventListener('mouseleave', () => {
+                            if (modelFuseTimeout) {
+                                clearTimeout(modelFuseTimeout);
+                                modelFuseTimeout = null;
+                            }
+                        });
+
                         dynamicModel.classList.add('clickable');
                     }
                 }
@@ -514,6 +708,74 @@
         const dialogTitle = document.getElementById('dialog-title');
         const dialogText = document.getElementById('dialog-text');
         const closeBtn = document.getElementById('close-dialog');
+
+        // LÓGICA DO HOTSPOT 3D
+        function hideInfoPanel3D() {
+            const container = document.querySelector('#infoPanelContainer3D');
+            if (container) {
+                container.innerHTML = '';
+                const hotspotIcon = document.querySelector('#hotspot-3d-icon');
+                if (hotspotIcon) hotspotIcon.setAttribute('visible', true);
+            }
+        }
+
+        // Configura hotspot 3D
+        const hotspot3D = document.querySelector('[data-triggerable-button="3d"]');
+        if (hotspot3D) {
+            let fuseTimeout = null;
+
+            const openPanel3D = function (event) {
+                if (fuseTimeout) {
+                    clearTimeout(fuseTimeout);
+                    fuseTimeout = null;
+                }
+
+                const template = document.querySelector('#infoPanel3D');
+                const container = document.querySelector('#infoPanelContainer3D');
+
+                if (!container || !template) return;
+
+                hideInfoPanel3D();
+
+                const clone = document.importNode(template.content, true);
+                container.appendChild(clone);
+
+                const hotspotIcon = document.querySelector('#hotspot-3d-icon');
+                if (hotspotIcon) hotspotIcon.setAttribute('visible', false);
+
+                setTimeout(() => {
+                    const closeBtn = container.querySelector('#close-btn-3d');
+                    if (closeBtn) {
+                        closeBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            hideInfoPanel3D();
+                        });
+                    }
+
+                    const viewBtn = container.querySelector('#view-3d-btn');
+                    if (viewBtn) {
+                        viewBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            navegarParaCena3();
+                        });
+                    }
+                }, 100);
+            };
+
+            hotspot3D.addEventListener('click', openPanel3D);
+
+            hotspot3D.addEventListener('fusing', (e) => {
+                if (fuseTimeout) clearTimeout(fuseTimeout);
+                fuseTimeout = setTimeout(() => openPanel3D(e), 2000);
+            });
+
+            hotspot3D.addEventListener('mouseleave', () => {
+                if (fuseTimeout) {
+                    clearTimeout(fuseTimeout);
+                    fuseTimeout = null;
+                }
+            });
+        }
 
         // Adicionar eventos de clique nos painéis
         document.querySelectorAll('.gallery-panel').forEach(panel => {

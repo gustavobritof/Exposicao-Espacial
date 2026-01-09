@@ -22,6 +22,7 @@
             /* Fundo preto ajuda na transição */
         }
     </style>
+    <link rel="stylesheet" href="screenloader.css">
     <script>
         // Carrega configurações dos modelos
         let modelsConfig = {};
@@ -61,7 +62,24 @@
 </head>
 
 <body>
+    <div id="custom-loader">
+        <div class="stars"></div>
 
+        <div class="orbit-container">
+            <div class="orbit orbit-1"></div>
+            <div class="orbit orbit-2"></div>
+            <div class="orbit orbit-3"></div>
+            <div class="planet"></div>
+            <div class="satellite"></div>
+        </div>
+
+        <div class="loader-text">CARREGANDO</div>
+
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="progress-text" id="progress-text">0%</div>
+    </div>
     <a-scene id="scene01">
 
         <a-assets>
@@ -705,91 +723,6 @@
                 window.location.href = 'scene02.html';
             }, 500);
         }
-
-        AFRAME.registerComponent('vr-link', {
-            schema: {
-                href: { type: 'string' },
-                fuseTimeout: { type: 'number', default: 2000 }
-            },
-
-            init() {
-                this.isFusing = false;
-                this.startTime = 0;
-
-                this.el.classList.add('clickable');
-
-                this.onEnter = this.onEnter.bind(this);
-                this.onLeave = this.onLeave.bind(this);
-                this.onClick = this.onClick.bind(this);
-
-                this.el.addEventListener('mouseenter', this.onEnter);
-                this.el.addEventListener('mouseleave', this.onLeave);
-                this.el.addEventListener('click', this.onClick);
-            },
-
-            onEnter() {
-                // inicia fuse manual
-                if (!this.el.sceneEl.is('vr-mode')) return;
-                this.isFusing = true;
-                this.startTime = performance.now();
-                this.el.emit('vr-fuse-start');
-            },
-
-            onLeave() {
-                this.isFusing = false;
-                this.startTime = 0;
-                this.el.emit('vr-fuse-cancel');
-            },
-
-            onClick() {
-                // desktop / trigger
-                this.navigate();
-            },
-
-            tick() {
-                if (!this.isFusing) return;
-
-                const elapsed = performance.now() - this.startTime;
-                if (elapsed >= this.data.fuseTimeout) {
-                    this.navigate();
-                    this.isFusing = false;
-                }
-            },
-
-            navigate() {
-                this.el.emit('vr-fuse-complete');
-                window.location.href = this.data.href;
-            }
-        });
-
-
-        AFRAME.registerShader('portal', {
-            schema: {
-                pano: { type: 'map', is: 'uniform' }
-            },
-
-            vertexShader: `
-            varying vec2 vUv;
-            void main() {
-                vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-            `,
-
-            fragmentShader: `
-            uniform sampler2D pano;
-            varying vec2 vUv;
-
-            void main() {
-                // Mapeia UV do círculo (0 a 1) para centralizar a textura
-                vec2 uv = vUv;
-                gl_FragColor = texture2D(pano, uv);
-            }
-            `
-        });
-
-
-        // ...existing code...
     </script>
 
 

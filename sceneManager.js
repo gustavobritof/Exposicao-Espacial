@@ -122,3 +122,146 @@ AFRAME.registerComponent('wall-collision', {
         });
     }
 });
+
+
+window.addEventListener('load', () => {
+    // Gera estrelas aleatórias
+    const starsContainer = document.querySelector('.stars');
+    for (let i = 0; i < 100; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.animationDelay = Math.random() * 3 + 's';
+        starsContainer.appendChild(star);
+    }
+
+    const scene = document.querySelector('a-scene');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const loader = document.getElementById('custom-loader');
+
+    // Simula progresso de carregamento
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90;
+
+        progressBar.style.width = progress + '%';
+        progressText.textContent = Math.floor(progress) + '%';
+    }, 200);
+
+    // Quando a cena carregar completamente
+    scene.addEventListener('loaded', () => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+
+        setTimeout(() => {
+            loader.classList.add('fade-out');
+            document.body.style.opacity = '1';
+
+            setTimeout(() => {
+                loader.style.display = 'none';
+            }, 800);
+        }, 500);
+    });
+
+    // Fallback caso não dispare o evento 'loaded'
+    setTimeout(() => {
+        if (!loader.classList.contains('fade-out')) {
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            progressText.textContent = '100%';
+            loader.classList.add('fade-out');
+            document.body.style.opacity = '1';
+
+            setTimeout(() => {
+                loader.style.display = 'none';
+            }, 800);
+        }
+    }, 8000);
+});
+
+
+AFRAME.registerComponent('vr-link', {
+    schema: {
+        href: { type: 'string' },
+        fuseTimeout: { type: 'number', default: 2000 }
+    },
+
+    init() {
+        this.isFusing = false;
+        this.startTime = 0;
+
+        this.el.classList.add('clickable');
+
+        this.onEnter = this.onEnter.bind(this);
+        this.onLeave = this.onLeave.bind(this);
+        this.onClick = this.onClick.bind(this);
+
+        this.el.addEventListener('mouseenter', this.onEnter);
+        this.el.addEventListener('mouseleave', this.onLeave);
+        this.el.addEventListener('click', this.onClick);
+    },
+
+    onEnter() {
+        // inicia fuse manual
+        if (!this.el.sceneEl.is('vr-mode')) return;
+        this.isFusing = true;
+        this.startTime = performance.now();
+        this.el.emit('vr-fuse-start');
+    },
+
+    onLeave() {
+        this.isFusing = false;
+        this.startTime = 0;
+        this.el.emit('vr-fuse-cancel');
+    },
+
+    onClick() {
+        // desktop / trigger
+        this.navigate();
+    },
+
+    tick() {
+        if (!this.isFusing) return;
+
+        const elapsed = performance.now() - this.startTime;
+        if (elapsed >= this.data.fuseTimeout) {
+            this.navigate();
+            this.isFusing = false;
+        }
+    },
+
+    navigate() {
+        this.el.emit('vr-fuse-complete');
+        window.location.href = this.data.href;
+    }
+});
+
+
+AFRAME.registerShader('portal', {
+    schema: {
+        pano: { type: 'map', is: 'uniform' }
+    },
+
+    vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+            `,
+
+    fragmentShader: `
+            uniform sampler2D pano;
+            varying vec2 vUv;
+
+            void main() {
+                // Mapeia UV do círculo (0 a 1) para centralizar a textura
+                vec2 uv = vUv;
+                gl_FragColor = texture2D(pano, uv);
+            }
+            `
+});
