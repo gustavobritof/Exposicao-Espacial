@@ -197,7 +197,7 @@
 
         <a-camera id="main-camera" wall-collision position="0 1.6 0" cursor="rayOrigin: mouse"
             raycaster="objects: .clickable; far: 20"
-            look-controls="magicWindowTrackingEnabled: false; touchEnabled: true; pointerLockEnabled: false">
+            look-controls="magicWindowTrackingEnabled: false; touchEnabled: true" mobile-look-controls>
 
             <a-cursor color="#ffffff" fuse="true" fuse-timeout="2000"
                 animation__fusing="property: scale; startEvents: fusing; easing: easeInCubic; dur: 2000; from: 1 1 1; to: 0.1 0.1 0.1"
@@ -715,6 +715,42 @@
                 window.location.href = 'scene02.html';
             }, 500);
         }
+
+        AFRAME.registerComponent('mobile-look-controls', {
+            init: function () {
+                this.onTouchMove = this.onTouchMove.bind(this);
+                this.onTouchStart = this.onTouchStart.bind(this);
+
+                if (AFRAME.utils.device.isMobile()) {
+                    window.addEventListener('touchmove', this.onTouchMove);
+                    window.addEventListener('touchstart', this.onTouchStart);
+                }
+            },
+
+            onTouchStart: function (evt) {
+                this.touchStartX = evt.touches[0].pageX;
+                this.touchStartY = evt.touches[0].pageY;
+            },
+
+            onTouchMove: function (evt) {
+                if (!this.touchStartX) return;
+
+                const deltaX = evt.touches[0].pageX - this.touchStartX;
+                const deltaY = evt.touches[0].pageY - this.touchStartY;
+
+                const rotation = this.el.getAttribute('rotation');
+                rotation.y -= deltaX * 0.3;
+                rotation.x -= deltaY * 0.3;
+
+                // Limita rotação vertical
+                rotation.x = Math.max(-90, Math.min(90, rotation.x));
+
+                this.el.setAttribute('rotation', rotation);
+
+                this.touchStartX = evt.touches[0].pageX;
+                this.touchStartY = evt.touches[0].pageY;
+            }
+        });
     </script>
 
 
